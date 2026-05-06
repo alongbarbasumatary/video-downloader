@@ -93,17 +93,9 @@ def parse_formats(data: dict) -> list:
             and "m3u8" not in url
             and url
         ):
-            size_bytes = fmt.get("filesize") or fmt.get("filesize_approx") or 0
-            size_mb = round(size_bytes / (1024 * 1024), 1)
-            resolution = (
-                fmt.get("resolution")
-                or (f"{fmt['width']}x{fmt['height']}" if fmt.get("width") and fmt.get("height") else None)
-                or fmt.get("format_note")
-                or fmt.get("format_id")
-                or "Unknown"
-            )
+            size_mb = round(fmt.get("filesize", 0) / (1024 * 1024), 1)
             filtered.append({
-                "resolution":  resolution,
+                "resolution":  fmt.get("resolution", "Unknown"),
                 "url":         url,
                 "filesize_mb": size_mb,
             })
@@ -118,18 +110,7 @@ def download_video(video_url: str, resolution: str) -> str:
     safe_res  = resolution.replace("x", "_").replace(" ", "_")
     filename  = f"{safe_res}_{uuid.uuid4().hex[:8]}.mp4"
     filepath  = os.path.join(TEMP_DIR, filename)
-    from urllib.parse import urlparse
-    parsed   = urlparse(video_url)
-    origin   = f"{parsed.scheme}://{parsed.netloc}"
-    dl_headers = {
-        "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Referer":         origin + "/",
-        "Origin":          origin,
-        "Accept":          "*/*",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Connection":      "keep-alive",
-    }
-    with requests.get(video_url, stream=True, timeout=120, headers=dl_headers) as r:
+    with requests.get(video_url, stream=True, timeout=60) as r:
         r.raise_for_status()
         with open(filepath, "wb") as f:
             for chunk in r.iter_content(chunk_size=65536):
@@ -785,8 +766,7 @@ HTML = r"""<!DOCTYPE html>
 
       currentFormats = data.formats;
       renderFormats(data.formats);
-      setFetchLoading(false, `Found ${data.formats.length} format(s). Starting highest quality download…`);
-      startDownload(0);
+      setFetchLoading(false, `Found ${data.formats.length} format(s).`);
     } catch(e) {
       setFetchLoading(false, '');
       toast(e.message, 'error');
