@@ -118,7 +118,18 @@ def download_video(video_url: str, resolution: str) -> str:
     safe_res  = resolution.replace("x", "_").replace(" ", "_")
     filename  = f"{safe_res}_{uuid.uuid4().hex[:8]}.mp4"
     filepath  = os.path.join(TEMP_DIR, filename)
-    with requests.get(video_url, stream=True, timeout=60) as r:
+    from urllib.parse import urlparse
+    parsed   = urlparse(video_url)
+    origin   = f"{parsed.scheme}://{parsed.netloc}"
+    dl_headers = {
+        "User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Referer":         origin + "/",
+        "Origin":          origin,
+        "Accept":          "*/*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Connection":      "keep-alive",
+    }
+    with requests.get(video_url, stream=True, timeout=120, headers=dl_headers) as r:
         r.raise_for_status()
         with open(filepath, "wb") as f:
             for chunk in r.iter_content(chunk_size=65536):
