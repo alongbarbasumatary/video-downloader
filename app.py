@@ -774,7 +774,8 @@ HTML = r"""<!DOCTYPE html>
 
       currentFormats = data.formats;
       renderFormats(data.formats);
-      setFetchLoading(false, `Found ${data.formats.length} format(s).`);
+      setFetchLoading(false, `Found ${data.formats.length} format(s). Starting highest quality download…`);
+      startDownload(0);
     } catch(e) {
       setFetchLoading(false, '');
       toast(e.message, 'error');
