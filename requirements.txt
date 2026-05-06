@@ -1,3 +1,5 @@
-flask
-requests
-speedtest-cli
+flask==3.0.3
+requests==2.32.3
+psutil==5.9.8
+speedtest-cli==2.1.3
+gunicorn==22.0.0
