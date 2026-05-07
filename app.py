@@ -83,6 +83,7 @@ def parse_formats(data: dict) -> list:
     if not results:
         return []
     formats = results[0].get("formats", [])
+    logger.info("RAW FORMATS: %s", formats)  # DEBUG
     filtered = []
     for fmt in formats:
         url = fmt.get("url", "")
