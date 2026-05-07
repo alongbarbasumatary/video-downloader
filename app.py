@@ -442,44 +442,79 @@ HTML = r"""<!DOCTYPE html>
   @keyframes spin { to { transform: rotate(360deg); } }
   .spinner.active { display: block; }
 
-  /* Format list */
-  .formats { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+  /* Format list — radio style */
+  .formats { display: flex; flex-direction: column; gap: 0; margin-top: 8px;
+             border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
   .fmt-row {
-    display: flex; align-items: center; gap: 12px;
+    display: flex; align-items: center; gap: 14px;
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: background .15s;
+    user-select: none;
+  }
+  .fmt-row:last-child { border-bottom: none; }
+  .fmt-row:hover { background: rgba(124,92,252,.07); }
+  .fmt-row.selected { background: rgba(124,92,252,.13); }
+
+  /* Custom radio circle */
+  .fmt-radio {
+    width: 20px; height: 20px; min-width: 20px;
+    border-radius: 50%;
+    border: 2px solid var(--muted);
+    display: flex; align-items: center; justify-content: center;
     transition: border-color .2s;
   }
-  .fmt-row:hover { border-color: var(--accent); }
+  .fmt-row.selected .fmt-radio { border-color: var(--accent); }
+  .fmt-radio-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: none;
+  }
+  .fmt-row.selected .fmt-radio-dot { display: block; }
+
+  /* Labels */
+  .fmt-info { flex: 1; display: flex; align-items: center; gap: 10px; }
   .fmt-res {
     font-weight: 700;
-    font-size: 1rem;
+    font-size: .95rem;
     color: var(--text);
-    min-width: 70px;
+  }
+  .fmt-badge {
+    font-size: .72rem; font-weight: 700;
+    padding: 2px 8px; border-radius: 6px;
+    background: rgba(124,92,252,.18);
+    color: var(--accent);
+    text-transform: uppercase; letter-spacing: .5px;
   }
   .fmt-size {
+    margin-left: auto;
     font-family: var(--mono);
     font-size: .8rem;
     color: var(--muted);
-    flex: 1;
   }
+
+  /* Single download button below list */
   .dl-btn {
-    display: flex; align-items: center; gap: 6px;
-    padding: 8px 18px;
-    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%;
+    margin-top: 14px;
+    padding: 13px 24px;
+    border-radius: 10px;
     border: none;
     background: linear-gradient(135deg, var(--accent), #5c3ccc);
     color: #fff;
     font-family: var(--sans);
     font-weight: 700;
-    font-size: .82rem;
+    font-size: .95rem;
     cursor: pointer;
     transition: all .2s;
+    box-shadow: 0 4px 20px rgba(124,92,252,.3);
   }
-  .dl-btn:hover { transform: translateY(-1px); }
-  .dl-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+  .dl-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(124,92,252,.4); }
+  .dl-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
 
   /* Progress bar */
   .progress-wrap { margin-top: 14px; display: none; }
@@ -662,6 +697,9 @@ HTML = r"""<!DOCTYPE html>
     <div class="card" id="formatsCard" style="display:none">
       <div class="card-title">Available Formats</div>
       <div class="formats" id="formatsList"></div>
+      <button class="dl-btn" id="dlBtn" onclick="startDownload()" style="display:none">
+        ⬇ Download MP4
+      </button>
       <div class="progress-wrap" id="progressWrap">
         <div class="progress-bar-bg"><div class="progress-bar" id="progressBar"></div></div>
         <div class="status"><span id="dlStatus"></span></div>
@@ -781,23 +819,45 @@ HTML = r"""<!DOCTYPE html>
 
   function renderFormats(formats) {
     const list = document.getElementById('formatsList');
-    list.innerHTML = formats.map((f, i) => `
-      <div class="fmt-row">
-        <span class="fmt-res">${f.resolution}</span>
-        <span class="fmt-size">${f.filesize_mb > 0 ? f.filesize_mb + ' MB' : 'size unknown'}</span>
-        <button class="dl-btn" onclick="startDownload(${i})">
-          ⬇ Download
-        </button>
-      </div>
-    `).join('');
+    list.innerHTML = formats.map((f, i) => {
+      const label = f.resolution.includes('x')
+        ? f.resolution
+        : f.resolution;
+      // Derive quality badge from resolution string
+      const num = parseInt((f.resolution.match(/\d+/) || ['0'])[0]);
+      const badge = num >= 1080 ? 'FHD' : num >= 720 ? 'HD' : num >= 480 ? 'SD' : num > 0 ? 'LD' : 'MP4';
+      const size  = f.filesize_mb > 0 ? f.filesize_mb + ' MB' : '';
+      const sel   = i === 0 ? 'selected' : '';
+      return `
+        <div class="fmt-row ${sel}" onclick="selectFormat(${i}, this)">
+          <div class="fmt-radio"><div class="fmt-radio-dot"></div></div>
+          <div class="fmt-info">
+            <span class="fmt-res">${label}</span>
+            <span class="fmt-badge">${badge}</span>
+          </div>
+          ${size ? `<span class="fmt-size">${size}</span>` : ''}
+        </div>`;
+    }).join('');
+
     document.getElementById('formatsCard').style.display = 'block';
     document.getElementById('progressWrap').classList.remove('active');
+    document.getElementById('dlBtn').style.display = 'flex';
+    selectedFormatIdx = 0;
+  }
+
+  let selectedFormatIdx = 0;
+
+  function selectFormat(idx, el) {
+    document.querySelectorAll('.fmt-row').forEach(r => r.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedFormatIdx = idx;
   }
 
   // ── Download ───────────────────────────────────────────────────────────────
-  async function startDownload(idx) {
-    const fmt = currentFormats[idx];
-    document.querySelectorAll('.dl-btn').forEach(b => b.disabled = true);
+  async function startDownload() {
+    const fmt = currentFormats[selectedFormatIdx];
+    document.getElementById('dlBtn').disabled = true;
+    document.querySelectorAll('.fmt-row').forEach(r => r.style.pointerEvents = 'none');
 
     const progressWrap = document.getElementById('progressWrap');
     const progressBar  = document.getElementById('progressBar');
@@ -841,7 +901,8 @@ HTML = r"""<!DOCTYPE html>
       dlStatus.textContent = '❌ ' + e.message;
       toast(e.message, 'error');
     } finally {
-      document.querySelectorAll('.dl-btn').forEach(b => b.disabled = false);
+      document.getElementById('dlBtn').disabled = false;
+      document.querySelectorAll('.fmt-row').forEach(r => r.style.pointerEvents = '');
     }
   }
 
