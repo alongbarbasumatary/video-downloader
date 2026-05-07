@@ -94,13 +94,29 @@ def parse_formats(data: dict) -> list:
             and url
         ):
             size_mb = round(fmt.get("filesize", 0) / (1024 * 1024), 1)
+            # Build a best-effort resolution label from available fields
+            resolution = fmt.get("resolution", "")
+            height     = fmt.get("height") or fmt.get("h")
+            width      = fmt.get("width")  or fmt.get("w")
+            note       = fmt.get("format_note") or fmt.get("quality_label") or ""
+            if not resolution or resolution.lower() in ("unknown", "none", ""):
+                if height:
+                    resolution = f"{width}x{height}" if width else f"{height}p"
+                elif note:
+                    resolution = note
+                else:
+                    resolution = "Unknown"
             filtered.append({
-                "resolution":  fmt.get("resolution", "Unknown"),
+                "resolution":  resolution,
                 "url":         url,
                 "filesize_mb": size_mb,
+                "height":      height or 0,
             })
     filtered.sort(
-        key=lambda x: int(m.group()) if (m := re.search(r"\d+", x["resolution"])) else 0,
+        key=lambda x: (
+            x["height"] if x["height"]
+            else int(m.group()) if (m := re.search(r"\d+", x["resolution"])) else 0
+        ),
         reverse=True,
     )
     return filtered
@@ -825,7 +841,7 @@ HTML = r"""<!DOCTYPE html>
         : f.resolution;
       // Derive quality badge from resolution string
       const num = parseInt((f.resolution.match(/\d+/) || ['0'])[0]);
-      const badge = num >= 1080 ? 'FHD' : num >= 720 ? 'HD' : num >= 480 ? 'SD' : num > 0 ? 'LD' : 'MP4';
+      const badge = num >= 1080 ? 'FHD' : num >= 720 ? 'HD' : num >= 480 ? 'SD' : num >= 360 ? 'LD' : 'MP4';
       const size  = f.filesize_mb > 0 ? f.filesize_mb + ' MB' : '';
       const sel   = i === 0 ? 'selected' : '';
       return `
